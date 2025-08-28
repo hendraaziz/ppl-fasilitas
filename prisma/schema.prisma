@@ -1,0 +1,228 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Enums
+enum Role {
+  MAHASISWA
+  PETUGAS
+  EKSTERNAL
+}
+
+enum StatusPeminjaman {
+  DIPROSES
+  DISETUJUI
+  DITOLAK
+  PERLU_REVISI
+}
+
+enum StatusBooking {
+  TERSEDIA
+  TERBOOKED
+}
+
+enum StatusPembayaran {
+  BELUM_BAYAR
+  SUDAH_BAYAR
+  VERIFIKASI
+}
+
+enum JenisNotifikasi {
+  DISETUJUI
+  DITOLAK
+  REVISI
+  PEMBAYARAN
+}
+
+enum TipePengguna {
+  MAHASISWA
+  EKSTERNAL
+  PETUGAS
+}
+
+// Master Tables
+model Pengguna {
+  id           String       @id @default(cuid())
+  nama         String
+  email        String       @unique
+  role         Role
+  tipePengguna TipePengguna
+  password     String?      // Optional untuk petugas
+  googleId     String?      // Optional untuk mahasiswa dengan SSO UGM
+  otpCode      String?      // Optional untuk eksternal dengan OTP
+  otpExpiry    DateTime?    // Expiry time untuk OTP
+  telepon      String?      // Nomor telepon
+  alamat       String?      // Alamat
+  tanggalLahir DateTime?    // Tanggal lahir
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+
+  // Relations
+  peminjaman  Peminjaman[]
+  notifikasi  Notifikasi[]
+  auditLogs   AuditLog[]
+
+  @@map("pengguna")
+}
+
+model Fasilitas {
+  id          String   @id @default(cuid())
+  nama        String
+  lokasi      String
+  jenis       String
+  kapasitas   Int
+  deskripsi   String?
+  tersedia    Boolean  @default(true) // Status aktif/tidak aktif fasilitas
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  jadwalFasilitas JadwalFasilitas[]
+  peminjaman      Peminjaman[]
+
+  @@map("fasilitas")
+}
+
+model JadwalFasilitas {
+  id           String        @id @default(cuid())
+  fasilitasId  String
+  tanggal      DateTime
+  waktuMulai   DateTime
+  waktuSelesai DateTime
+  statusBooking StatusBooking @default(TERSEDIA)
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  // Relations
+  fasilitas Fasilitas @relation(fields: [fasilitasId], references: [id], onDelete: Cascade)
+
+  @@unique([fasilitasId, tanggal, waktuMulai, waktuSelesai])
+  @@map("jadwal_fasilitas")
+}
+
+// Transactional Tables
+model Peminjaman {
+  id          String           @id @default(cuid())
+  userId      String
+  fasilitasId String
+  tglMulai    DateTime         // Tanggal dan waktu mulai
+  tglSelesai  DateTime         // Tanggal dan waktu selesai
+  tujuan      String
+  keterangan  String?
+  status      StatusPeminjaman @default(DIPROSES)
+  alasanTolak String?          // Wajib jika status DITOLAK
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  // Relations
+  user            Pengguna          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  fasilitas       Fasilitas         @relation(fields: [fasilitasId], references: [id], onDelete: Cascade)
+  suratPermohonan SuratPermohonan?
+  sip             SIP?
+  tagihan         Tagihan?
+  auditLogs       AuditLog[]
+
+  @@map("peminjaman")
+}
+
+model SuratPermohonan {
+  id           String   @id @default(cuid())
+  peminjamanId String   @unique
+  fileUrl      String   // Path ke file PDF
+  tanggalTerbit DateTime @default(now())
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  // Relations
+  peminjaman Peminjaman @relation(fields: [peminjamanId], references: [id], onDelete: Cascade)
+
+  @@map("surat_permohonan")
+}
+
+model SIP {
+  id           String   @id @default(cuid())
+  peminjamanId String   @unique
+  noSurat      String   @unique
+  fileUrl      String   // Path ke file PDF yang di-generate
+  tanggalTerbit DateTime @default(now())
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  // Relations
+  peminjaman Peminjaman @relation(fields: [peminjamanId], references: [id], onDelete: Cascade)
+
+  @@map("sip")
+}
+
+model Tagihan {
+  id              String           @id @default(cuid())
+  peminjamanId    String           @unique
+  biaya           Float
+  statusPembayaran StatusPembayaran @default(BELUM_BAYAR)
+  buktiTransferUrl String?         // Path ke file bukti transfer
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  // Relations
+  peminjaman Peminjaman @relation(fields: [peminjamanId], references: [id], onDelete: Cascade)
+
+  @@map("tagihan")
+}
+
+// Supporting Tables
+model Notifikasi {
+  id          String          @id @default(cuid())
+  userId      String
+  jenis       JenisNotifikasi
+  judul       String
+  pesan       String
+  tujuan      String          // Email atau nomor WA
+  waktuKirim  DateTime        @default(now())
+  statusDibaca Boolean        @default(false)
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  // Relations
+  user Pengguna @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("notifikasi")
+}
+
+model Panduan {
+  id           String       @id @default(cuid())
+  tipePengguna TipePengguna
+  judul        String
+  isi          String
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+
+  @@map("panduan")
+}
+
+model AuditLog {
+  id           String   @id @default(cuid())
+  userId       String
+  peminjamanId String?
+  aksi         String   // LOGIN, VERIFIKASI, APPROVE, REJECT, etc.
+  deskripsi    String
+  statusLama   String?
+  statusBaru   String?
+  createdAt    DateTime @default(now())
+
+  // Relations
+  user       Pengguna    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  peminjaman Peminjaman? @relation(fields: [peminjamanId], references: [id], onDelete: SetNull)
+
+  @@map("audit_log")
+}
