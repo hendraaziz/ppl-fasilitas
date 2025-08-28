@@ -136,7 +136,7 @@ async function main() {
           tanggal: currentDate,
           waktuMulai: new Date(`1970-01-01T${slot.start}:00.000Z`),
           waktuSelesai: new Date(`1970-01-01T${slot.end}:00.000Z`),
-          statusBooking: isAvailable ? 'TERSEDIA' : 'TERBOOKED'
+          statusBooking: isAvailable ? ('TERSEDIA' as const) : ('TERBOOKED' as const)
         })
       }
     }
@@ -208,7 +208,7 @@ async function main() {
       tglSelesai: new Date('2025-08-05T12:00:00.000Z'),
       tujuan: 'Seminar Nasional Teknologi',
       keterangan: 'Seminar dengan 300 peserta dari berbagai universitas',
-      status: 'DISETUJUI'
+      status: 'DISETUJUI' as const
     },
     {
       userId: eksternal.id,
@@ -217,7 +217,7 @@ async function main() {
       tglSelesai: new Date('2025-08-10T17:00:00.000Z'),
       tujuan: 'Workshop Pelatihan Karyawan',
       keterangan: 'Pelatihan internal perusahaan untuk 80 karyawan',
-      status: 'DIPROSES'
+      status: 'DIPROSES' as const
     },
     {
       userId: mahasiswa.id,
@@ -226,7 +226,7 @@ async function main() {
       tglSelesai: new Date('2025-08-15T18:00:00.000Z'),
       tujuan: 'Turnamen Basket Antar Fakultas',
       keterangan: 'Final turnamen basket dengan 40 peserta',
-      status: 'DITOLAK',
+      status: 'DITOLAK' as const,
       alasanTolak: 'Bentrok dengan jadwal maintenance lapangan'
     },
     {
@@ -236,7 +236,7 @@ async function main() {
       tglSelesai: new Date('2025-08-20T11:00:00.000Z'),
       tujuan: 'Rapat Koordinasi Proyek',
       keterangan: 'Meeting dengan tim eksternal untuk koordinasi proyek',
-      status: 'PERLU_REVISI'
+      status: 'PERLU_REVISI' as const
     },
     {
       userId: mahasiswa.id,
@@ -245,7 +245,7 @@ async function main() {
       tglSelesai: new Date('2025-08-25T22:00:00.000Z'),
       tujuan: 'Malam Kebudayaan Mahasiswa',
       keterangan: 'Acara seni dan budaya dengan 150 peserta',
-      status: 'DISETUJUI'
+      status: 'DISETUJUI' as const
     },
     {
       userId: eksternal.id,
@@ -254,7 +254,7 @@ async function main() {
       tglSelesai: new Date('2025-08-28T16:00:00.000Z'),
       tujuan: 'Konferensi Internasional',
       keterangan: 'Konferensi dengan pembicara dari 5 negara',
-      status: 'DIPROSES'
+      status: 'DIPROSES' as const
     }
   ]
 
