@@ -21,7 +21,15 @@ export async function GET(request: NextRequest) {
     const skip = (page - 1) * limit
 
     // Build where clause
-    const where: Record<string, unknown> = {}
+    const where: Record<string, unknown> = {
+      tersedia: true // Only show active facilities by default
+    }
+    
+    // Allow showing all facilities if explicitly requested
+    const showAll = searchParams.get('showAll') === 'true'
+    if (showAll) {
+      delete where.tersedia
+    }
     
     if (search) {
       where.OR = [

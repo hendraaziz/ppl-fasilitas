@@ -49,8 +49,14 @@ export default function BookingPage() {
       return
     }
 
+    // Redirect admin to admin booking page
+    if (session?.user?.role === 'PETUGAS') {
+      router.push("/admin/bookings")
+      return
+    }
+
     loadFasilitas()
-  }, [status, router])
+  }, [status, router, session])
 
   // Real-time validation when form data changes
   useEffect(() => {

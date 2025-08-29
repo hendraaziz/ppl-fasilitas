@@ -14,55 +14,30 @@ import {
   Users, 
   Search,
   Filter,
-  Building
+  Building,
+  Upload
 } from "lucide-react"
 
-// Mock data for facilities
-const mockFacilities = [
-  {
-    id: 1,
-    nama: "Ruang Seminar A",
-    lokasi: "Gedung A Lantai 2",
-    kapasitas: 50,
-    fasilitas: ["Proyektor", "AC", "Sound System", "WiFi"],
-    tersedia: true,
-    gambar: "/api/placeholder/300/200"
-  },
-  {
-    id: 2,
-    nama: "Aula Utama",
-    lokasi: "Gedung Utama Lantai 1",
-    kapasitas: 200,
-    fasilitas: ["Panggung", "Sound System", "Lighting", "AC", "WiFi"],
-    tersedia: true,
-    gambar: "/api/placeholder/300/200"
-  },
-  {
-    id: 3,
-    nama: "Ruang Meeting B",
-    lokasi: "Gedung B Lantai 3",
-    kapasitas: 20,
-    fasilitas: ["TV LED", "AC", "WiFi", "Whiteboard"],
-    tersedia: false,
-    gambar: "/api/placeholder/300/200"
-  },
-  {
-    id: 4,
-    nama: "Lab Komputer 1",
-    lokasi: "Gedung C Lantai 1",
-    kapasitas: 30,
-    fasilitas: ["30 PC", "Proyektor", "AC", "WiFi"],
-    tersedia: true,
-    gambar: "/api/placeholder/300/200"
-  }
-]
+// Interface for facility data
+interface Facility {
+  id: string
+  nama: string
+  lokasi: string
+  jenis: string
+  kapasitas: number
+  deskripsi?: string
+  tersedia: boolean
+  createdAt: string
+  updatedAt: string
+}
 
 export default function BookingPage() {
   const { data: session, status } = useSession()
   const router = useRouter()
-  const [facilities] = useState(mockFacilities)
+  const [facilities, setFacilities] = useState<Facility[]>([])
   const [searchTerm, setSearchTerm] = useState("")
-  const [selectedFacility, setSelectedFacility] = useState<typeof mockFacilities[0] | null>(null)
+  const [selectedFacility, setSelectedFacility] = useState<Facility | null>(null)
+  const [isLoadingFacilities, setIsLoadingFacilities] = useState(true)
   const [bookingForm, setBookingForm] = useState({
     tanggalMulai: "",
     tanggalSelesai: "",
@@ -70,14 +45,35 @@ export default function BookingPage() {
     jamSelesai: "",
     tujuan: "",
     jumlahPeserta: "",
-    keterangan: ""
+    keterangan: "",
+    tipePengguna: "MAHASISWA" as "MAHASISWA" | "EKSTERNAL",
+    dokumenFile: null as File | null
   })
   const [message, setMessage] = useState<{ type: "success" | "error", text: string } | null>(null)
   const [isLoading, setIsLoading] = useState(false)
 
+  // Fetch facilities from API
+  const fetchFacilities = async () => {
+    try {
+      setIsLoadingFacilities(true)
+      const response = await fetch('/api/facilities')
+      const data = await response.json()
+      
+      if (data.success) {
+        setFacilities(data.data)
+      }
+    } catch (error) {
+      console.error('Error fetching facilities:', error)
+    } finally {
+      setIsLoadingFacilities(false)
+    }
+  }
+
   useEffect(() => {
     if (status === "unauthenticated") {
       router.push("/auth/signin")
+    } else if (status === "authenticated") {
+      fetchFacilities()
     }
   }, [status, router])
 
@@ -86,9 +82,25 @@ export default function BookingPage() {
     facility.lokasi.toLowerCase().includes(searchTerm.toLowerCase())
   )
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target
     setBookingForm(prev => ({ ...prev, [name]: value }))
+  }
+
+  // Handle file upload
+  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (file) {
+      if (file.size > 2 * 1024 * 1024) { // 2MB limit
+        setMessage({ type: "error", text: "File tidak boleh lebih dari 2MB" })
+        return
+      }
+      if (file.type !== "application/pdf") {
+        setMessage({ type: "error", text: "File harus berformat PDF" })
+        return
+      }
+      setBookingForm(prev => ({ ...prev, dokumenFile: file }))
+    }
   }
 
   const handleBooking = async () => {
@@ -98,36 +110,49 @@ export default function BookingPage() {
     setMessage(null)
 
     try {
-      // TODO: Implement API call to create booking
-      // const response = await fetch('/api/bookings', {
-      //   method: 'POST',
-      //   headers: { 'Content-Type': 'application/json' },
-      //   body: JSON.stringify({
-      //     fasilitasId: selectedFacility.id,
-      //     ...bookingForm
-      //   })
-      // })
-      
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 2000))
-      
-      setMessage({ 
-        type: "success", 
-        text: `Booking ${selectedFacility.nama} berhasil diajukan. Menunggu persetujuan petugas.` 
+      // Combine date and time for API
+      const tglMulai = new Date(`${bookingForm.tanggalMulai}T${bookingForm.jamMulai}:00`).toISOString()
+      const tglSelesai = new Date(`${bookingForm.tanggalSelesai}T${bookingForm.jamSelesai}:00`).toISOString()
+
+      const response = await fetch('/api/bookings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          fasilitasId: selectedFacility.id,
+          tglMulai,
+          tglSelesai,
+          tujuan: bookingForm.tujuan,
+          keterangan: bookingForm.keterangan,
+          userId: session?.user?.id // Add userId from session
+        })
       })
-      
-      // Reset form
-      setSelectedFacility(null)
-      setBookingForm({
-        tanggalMulai: "",
-        tanggalSelesai: "",
-        jamMulai: "",
-        jamSelesai: "",
-        tujuan: "",
-        jumlahPeserta: "",
-        keterangan: ""
-      })
-    } catch {
+
+      const result = await response.json()
+
+      if (result.success) {
+        setMessage({ 
+          type: "success", 
+          text: `Booking ${selectedFacility.nama} berhasil diajukan. Menunggu persetujuan petugas.` 
+        })
+        
+        // Reset form
+        setSelectedFacility(null)
+        setBookingForm({
+          tanggalMulai: "",
+          tanggalSelesai: "",
+          jamMulai: "",
+          jamSelesai: "",
+          tujuan: "",
+          jumlahPeserta: "",
+          keterangan: "",
+          tipePengguna: "MAHASISWA",
+          dokumenFile: null
+        })
+      } else {
+        setMessage({ type: "error", text: result.error || "Gagal mengajukan booking" })
+      }
+    } catch (error) {
+      console.error('Booking error:', error)
       setMessage({ type: "error", text: "Gagal mengajukan booking" })
     } finally {
       setIsLoading(false)
@@ -135,12 +160,19 @@ export default function BookingPage() {
   }
 
   const isFormValid = () => {
-    return bookingForm.tanggalMulai && 
-           bookingForm.tanggalSelesai && 
-           bookingForm.jamMulai && 
-           bookingForm.jamSelesai && 
-           bookingForm.tujuan && 
-           bookingForm.jumlahPeserta
+    const basicValidation = bookingForm.tanggalMulai && 
+                           bookingForm.tanggalSelesai && 
+                           bookingForm.jamMulai && 
+                           bookingForm.jamSelesai && 
+                           bookingForm.tujuan && 
+                           bookingForm.jumlahPeserta
+    
+    // For external users, document is required
+    if (bookingForm.tipePengguna === "EKSTERNAL") {
+      return basicValidation && bookingForm.dokumenFile !== null
+    }
+    
+    return basicValidation
   }
 
   if (status === "loading") {
@@ -208,7 +240,18 @@ export default function BookingPage() {
 
             {/* Facilities Grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {filteredFacilities.map((facility) => (
+              {isLoadingFacilities ? (
+                <div className="col-span-2 text-center py-8">
+                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+                  <p className="text-gray-600">Memuat fasilitas...</p>
+                </div>
+              ) : filteredFacilities.length === 0 ? (
+                <div className="col-span-2 text-center py-8">
+                  <Building className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                  <p className="text-gray-500">Tidak ada fasilitas yang tersedia</p>
+                </div>
+              ) : (
+                filteredFacilities.map((facility: Facility) => (
                 <Card 
                   key={facility.id} 
                   className={`cursor-pointer transition-all hover:shadow-lg ${
@@ -245,22 +288,21 @@ export default function BookingPage() {
                       </div>
                       
                       <div>
-                        <p className="text-sm font-medium text-gray-700 mb-2">Fasilitas:</p>
-                        <div className="flex flex-wrap gap-1">
-                          {facility.fasilitas.map((item, index) => (
-                            <span 
-                              key={index}
-                              className="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded"
-                            >
-                              {item}
-                            </span>
-                          ))}
-                        </div>
+                        <p className="text-sm font-medium text-gray-700 mb-2">Jenis:</p>
+                        <span className="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded">
+                          {facility.jenis}
+                        </span>
+                        {facility.deskripsi && (
+                          <div className="mt-2">
+                            <p className="text-sm text-gray-600">{facility.deskripsi}</p>
+                          </div>
+                        )}
                       </div>
                     </div>
                   </CardContent>
                 </Card>
-              ))}
+                ))
+              )}
             </div>
           </div>
 
@@ -377,6 +419,47 @@ export default function BookingPage() {
                         rows={3}
                       />
                     </div>
+
+                    {/* Tipe Pengguna */}
+                    <div>
+                      <Label htmlFor="tipePengguna">Tipe Pengguna</Label>
+                      <select
+                        id="tipePengguna"
+                        name="tipePengguna"
+                        value={bookingForm.tipePengguna}
+                        onChange={handleInputChange}
+                        className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      >
+                        <option value="MAHASISWA">Mahasiswa</option>
+                        <option value="EKSTERNAL">Eksternal</option>
+                      </select>
+                    </div>
+
+                    {/* Upload Dokumen untuk Eksternal */}
+                    {bookingForm.tipePengguna === "EKSTERNAL" && (
+                      <div>
+                        <Label htmlFor="dokumenFile">Upload Dokumen (PDF, maks 2MB) *</Label>
+                        <div className="flex items-center gap-2 mt-1">
+                          <input
+                            id="dokumenFile"
+                            type="file"
+                            accept=".pdf"
+                            onChange={handleFileUpload}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                            required={bookingForm.tipePengguna === "EKSTERNAL"}
+                          />
+                          <Upload className="w-5 h-5 text-gray-400" />
+                        </div>
+                        {bookingForm.dokumenFile && (
+                          <p className="text-sm text-green-600 mt-1">
+                            File terpilih: {bookingForm.dokumenFile.name}
+                          </p>
+                        )}
+                        <p className="text-xs text-gray-500 mt-1">
+                          Wajib upload dokumen identitas atau surat keterangan untuk pengguna eksternal
+                        </p>
+                      </div>
+                    )}
 
                     <Button 
                       onClick={handleBooking}

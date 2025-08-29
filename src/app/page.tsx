@@ -47,7 +47,16 @@ export default function HomePage() {
               <Building className="h-8 w-8 text-blue-600 mr-3" />
               <h1 className="text-xl font-bold text-gray-900">Sistem Peminjaman Fasilitas</h1>
             </div>
-            <Button onClick={handleGetStarted} className="bg-blue-600 hover:bg-blue-700 text-white font-medium">Masuk</Button>
+            <div className="flex items-center gap-3">
+              <Button 
+                onClick={() => router.push('/monitor')} 
+                variant="outline" 
+                className="border-blue-600 text-blue-600 hover:bg-blue-50 font-medium"
+              >
+                Monitor Ruang
+              </Button>
+              <Button onClick={handleGetStarted} className="bg-blue-600 hover:bg-blue-700 text-white font-medium">Masuk</Button>
+            </div>
           </div>
         </div>
       </header>

@@ -110,11 +110,11 @@ export async function logout() {
     // Sign out from NextAuth if session exists
     await signOut({ 
       redirect: true,
-      callbackUrl: '/auth/signin'
+      callbackUrl: '/'
     })
   } catch (error) {
     console.error('Error during logout:', error)
-    // Fallback: force redirect to signin
-    window.location.href = '/auth/signin'
+    // Fallback: force redirect to home
+    window.location.href = '/'
   }
 }

@@ -223,12 +223,14 @@ export default function HistoryPage() {
                   : `Tidak ada peminjaman dengan status ${statusLabels[filter as keyof typeof statusLabels]}`
                 }
               </p>
-              <Button
-                onClick={() => router.push('/dashboard/booking')}
-                className="bg-blue-600 hover:bg-blue-700 text-white"
-              >
-                Buat Booking Baru
-              </Button>
+              {session?.user?.role !== 'PETUGAS' && (
+                <Button
+                  onClick={() => router.push('/dashboard/booking')}
+                  className="bg-blue-600 hover:bg-blue-700 text-white"
+                >
+                  Buat Booking Baru
+                </Button>
+              )}
             </CardContent>
           </Card>
         ) : (

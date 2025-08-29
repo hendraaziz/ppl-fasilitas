@@ -178,22 +178,24 @@ export default function DashboardPage() {
           <h2 className="text-2xl font-bold text-gray-900 mb-6">Quick Actions</h2>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {/* Booking Fasilitas - Available for all roles */}
-          <Card className="cursor-pointer hover:shadow-xl transition-all duration-200 transform hover:-translate-y-1 bg-white border-2 border-blue-200"
-                onClick={() => router.push('/dashboard/booking')}>
-            <CardHeader className="bg-blue-50 pb-4">
-              <CardTitle className="flex items-center gap-3 text-lg font-bold text-gray-900">
-                <Calendar className="h-6 w-6 text-blue-600" />
-                Booking Fasilitas
-              </CardTitle>
-              <CardDescription className="text-base font-medium text-gray-700">
-                Ajukan peminjaman fasilitas baru
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="pt-4">
-              <Button className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 text-base transition-colors duration-200">Buat Booking Baru</Button>
-            </CardContent>
-          </Card>
+          {/* Booking Fasilitas - Only for non-admin users */}
+          {userRole !== 'PETUGAS' && (
+            <Card className="cursor-pointer hover:shadow-xl transition-all duration-200 transform hover:-translate-y-1 bg-white border-2 border-blue-200"
+                  onClick={() => router.push('/dashboard/booking')}>
+              <CardHeader className="bg-blue-50 pb-4">
+                <CardTitle className="flex items-center gap-3 text-lg font-bold text-gray-900">
+                  <Calendar className="h-6 w-6 text-blue-600" />
+                  Booking Fasilitas
+                </CardTitle>
+                <CardDescription className="text-base font-medium text-gray-700">
+                  Ajukan peminjaman fasilitas baru
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="pt-4">
+                <Button className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 text-base transition-colors duration-200">Buat Booking Baru</Button>
+              </CardContent>
+            </Card>
+          )}
 
           {/* Riwayat Peminjaman - Available for all roles */}
           <Card className="cursor-pointer hover:shadow-xl transition-all duration-200 transform hover:-translate-y-1 bg-white border-2 border-green-200"
@@ -249,7 +251,7 @@ export default function DashboardPage() {
               </Card>
 
               <Card className="cursor-pointer hover:shadow-xl transition-all duration-200 transform hover:-translate-y-1 bg-white border-2 border-purple-200"
-                    onClick={() => router.push('/dashboard/admin/bookings')}>
+                    onClick={() => router.push('/admin/bookings')}>
                 <CardHeader className="bg-purple-50 pb-4">
                   <CardTitle className="flex items-center gap-3 text-lg font-bold text-gray-900">
                     <Users className="h-6 w-6 text-purple-600" />
