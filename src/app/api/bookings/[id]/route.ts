@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { z } from 'zod'
+import { sendBookingStatusEmail } from '@/lib/email'
 
 // Schema validation for booking update
 const bookingUpdateSchema = z.object({
@@ -195,6 +196,7 @@ export async function PUT(
       include: {
         user: {
           select: {
+            id: true,
             nama: true,
             email: true
           }
@@ -207,6 +209,47 @@ export async function PUT(
         }
       }
     })
+
+    // Send email notification
+    try {
+      const formatDate = (date: Date) => {
+        return new Intl.DateTimeFormat('id-ID', {
+          weekday: 'long',
+          year: 'numeric',
+          month: 'long',
+          day: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit'
+        }).format(date)
+      }
+
+      const bookingDetails = {
+        fasilitas: updatedBooking.fasilitas.nama,
+        tanggalMulai: formatDate(updatedBooking.tglMulai),
+        tanggalSelesai: formatDate(updatedBooking.tglSelesai),
+        tujuan: updatedBooking.tujuan
+      }
+
+      if (validatedData.status === 'DISETUJUI') {
+        await sendBookingStatusEmail(
+          updatedBooking.user.email,
+          updatedBooking.user.id,
+          'approved',
+          bookingDetails
+        )
+      } else if (validatedData.status === 'DITOLAK') {
+        await sendBookingStatusEmail(
+          updatedBooking.user.email,
+          updatedBooking.user.id,
+          'rejected',
+          bookingDetails,
+          validatedData.alasanTolak
+        )
+      }
+    } catch (emailError) {
+      console.error('Failed to send email notification:', emailError)
+      // Don't fail the request if email fails
+    }
 
     return NextResponse.json({
       success: true,

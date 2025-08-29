@@ -204,7 +204,8 @@ export default function BookingPage() {
         tglMulai,
         tglSelesai,
         tujuan: formData.keperluan,
-        keterangan: formData.jumlahPeserta ? `Jumlah peserta: ${formData.jumlahPeserta}` : undefined
+        keterangan: formData.jumlahPeserta ? `Jumlah peserta: ${formData.jumlahPeserta}` : undefined,
+        userId: session?.user?.id // Add userId from session
       }
       
       const response = await fetch('/api/bookings', {

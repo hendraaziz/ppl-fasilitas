@@ -49,7 +49,7 @@ export default function MonitorPage() {
       const response = await fetch('/api/facilities')
       if (response.ok) {
         const data = await response.json()
-        setFacilities(data.facilities || [])
+        setFacilities(data.data || [])
       }
     } catch (error) {
       console.error('Error fetching facilities:', error)
@@ -61,7 +61,7 @@ export default function MonitorPage() {
       const response = await fetch('/api/bookings')
       if (response.ok) {
         const data = await response.json()
-        setBookings(data.bookings || [])
+        setBookings(data.data || [])
       }
     } catch (error) {
       console.error('Error fetching bookings:', error)

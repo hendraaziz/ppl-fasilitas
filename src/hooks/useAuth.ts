@@ -32,10 +32,29 @@ export function useAuth(): AuthState {
   useEffect(() => {
     const checkExternalAuth = () => {
       try {
-        const token = localStorage.getItem('external_token')
+        // First try localStorage
+        let token = localStorage.getItem('external_token')
+        
+        // If not in localStorage, try to get from cookie (for SSR compatibility)
+        if (!token && typeof document !== 'undefined') {
+          const cookieMatch = document.cookie.match(/external_token=([^;]+)/)
+          if (cookieMatch) {
+            token = cookieMatch[1]
+            // Sync to localStorage for future use
+            localStorage.setItem('external_token', token)
+          }
+        }
+        
         if (token) {
           // Decode JWT token to get user info
           const payload = JSON.parse(atob(token.split('.')[1]))
+          
+          // Check if token is expired
+          const currentTime = Math.floor(Date.now() / 1000)
+          if (payload.exp && payload.exp < currentTime) {
+            throw new Error('Token expired')
+          }
+          
           setExternalUser({
             id: payload.userId,
             email: payload.email,
@@ -46,9 +65,12 @@ export function useAuth(): AuthState {
         }
       } catch (error) {
         console.error('Error parsing external token:', error)
-        // Clear invalid token
+        // Clear invalid token from both localStorage and cookie
         localStorage.removeItem('external_token')
-        document.cookie = 'external_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT'
+        if (typeof document !== 'undefined') {
+          document.cookie = 'external_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT'
+        }
+        setExternalUser(null)
       } finally {
         setIsLoadingExternal(false)
       }

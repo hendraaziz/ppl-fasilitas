@@ -67,10 +67,12 @@ export default function AdminBookingsPage() {
   const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
+  const [showRejectForm, setShowRejectForm] = useState(false)
   const [facilities, setFacilities] = useState<Facility[]>([])
   const [isLoadingFacilities, setIsLoadingFacilities] = useState(false)
   const [message, setMessage] = useState<{ type: "success" | "error", text: string } | null>(null)
   const [isLoading, setIsLoading] = useState(false)
+  const [rejectReason, setRejectReason] = useState('')
   const [bookingForm, setBookingForm] = useState({
     namaPeminjam: "",
     emailPeminjam: "",
@@ -283,26 +285,67 @@ export default function AdminBookingsPage() {
     return matchesSearch && matchesStatus
   })
 
+  const handleDownloadSip = async (bookingId: number) => {
+    try {
+      setIsLoading(true)
+      const response = await fetch(`/api/bookings/${bookingId}/generate-sip`)
+      
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || 'Gagal mengunduh SIP')
+      }
+      
+      const blob = await response.blob()
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.style.display = 'none'
+      a.href = url
+      a.download = `SIP-${bookingId}.pdf`
+      document.body.appendChild(a)
+      a.click()
+      window.URL.revokeObjectURL(url)
+      document.body.removeChild(a)
+      
+      setMessage({ type: "success", text: "SIP berhasil diunduh" })
+    } catch (error) {
+      console.error('Error downloading SIP:', error)
+      setMessage({ type: "error", text: error instanceof Error ? error.message : "Gagal mengunduh SIP" })
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
   const handleStatusUpdate = async (bookingId: number, newStatus: string, alasan?: string) => {
     setIsLoading(true)
     setMessage(null)
 
     try {
-      // TODO: Implement API call
-      // const response = await fetch(`/api/admin/bookings/${bookingId}/status`, {
-      //   method: 'PUT',
-      //   headers: { 'Content-Type': 'application/json' },
-      //   body: JSON.stringify({ status: newStatus, alasan })
-      // })
+      // Map status to Prisma enum values
+      const statusMapping = {
+        'APPROVED': 'DISETUJUI',
+        'REJECTED': 'DITOLAK', 
+        'COMPLETED': 'SELESAI'
+      }
       
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000))
+      const prismaStatus = statusMapping[newStatus as keyof typeof statusMapping] || newStatus
       
-      setBookings(prev => prev.map(booking => 
-        booking.id === bookingId 
-          ? { ...booking, status: newStatus, alasanPenolakan: alasan } as any
-          : booking
-      ))
+      const response = await fetch(`/api/bookings/${bookingId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          status: prismaStatus,
+          ...(alasan && { alasanTolak: alasan })
+        })
+      })
+      
+      const result = await response.json()
+      
+      if (!response.ok || !result.success) {
+        throw new Error(result.error || 'Gagal memperbarui status')
+      }
+      
+      // Refresh bookings list
+      await fetchBookings()
       
       const statusText = {
         'APPROVED': 'disetujui',
@@ -312,8 +355,9 @@ export default function AdminBookingsPage() {
       
       setMessage({ type: "success", text: `Booking berhasil ${statusText}` })
       setIsModalOpen(false)
-    } catch {
-      setMessage({ type: "error", text: "Gagal memperbarui status booking" })
+    } catch (error) {
+      console.error('Error updating booking status:', error)
+      setMessage({ type: "error", text: error instanceof Error ? error.message : "Gagal memperbarui status booking" })
     } finally {
       setIsLoading(false)
     }
@@ -328,6 +372,8 @@ export default function AdminBookingsPage() {
   const closeModal = () => {
     setIsModalOpen(false)
     setSelectedBooking(null)
+    setShowRejectForm(false)
+    setRejectReason('')
     setMessage(null)
   }
 
@@ -389,6 +435,30 @@ export default function AdminBookingsPage() {
     return null
   }
 
+  // Handle SIP download
+  const handleDownloadSIP = async (bookingId: number) => {
+    try {
+      const response = await fetch(`/api/bookings/${bookingId}/sip`)
+      if (response.ok) {
+        const blob = await response.blob()
+        const url = window.URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.style.display = 'none'
+        a.href = url
+        a.download = `SIP_${bookingId}.pdf`
+        document.body.appendChild(a)
+        a.click()
+        window.URL.revokeObjectURL(url)
+        document.body.removeChild(a)
+      } else {
+        setMessage({ type: "error", text: "Gagal mengunduh SIP" })
+      }
+    } catch (error) {
+      console.error('Error downloading SIP:', error)
+      setMessage({ type: "error", text: "Terjadi kesalahan saat mengunduh SIP" })
+    }
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50 py-8">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -425,6 +495,8 @@ export default function AdminBookingsPage() {
             </AlertDescription>
           </Alert>
         )}
+
+
 
         {/* Filters */}
         <div className="mb-6 flex flex-col sm:flex-row gap-4">
@@ -537,6 +609,17 @@ export default function AdminBookingsPage() {
                         Surat
                       </Button>
                     )}
+                    {booking.status === 'APPROVED' && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleDownloadSIP(booking.id)}
+                        className="border-blue-600 text-blue-600 hover:bg-blue-50"
+                      >
+                        <Download className="h-4 w-4 mr-1" />
+                        SIP
+                      </Button>
+                    )}
                   </div>
                 </div>
               </CardContent>
@@ -640,10 +723,58 @@ export default function AdminBookingsPage() {
                 {selectedBooking.status === "PENDING" && (
                   <div className="border-t border-gray-200 pt-6">
                     <Label className="text-sm font-medium text-gray-800 mb-3 block">Aksi</Label>
+                    
+                    {/* Form Penolakan - Hidden by default */}
+                    {showRejectForm && (
+                      <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg">
+                        <Label htmlFor="rejectReason" className="text-sm font-medium text-red-700 mb-2 block">
+                          Alasan Penolakan *
+                        </Label>
+                        <textarea
+                          id="rejectReason"
+                          value={rejectReason}
+                          onChange={(e) => setRejectReason(e.target.value)}
+                          placeholder="Masukkan alasan penolakan yang jelas..."
+                          className="w-full px-3 py-2 border border-red-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-red-500 resize-none bg-white"
+                          rows={3}
+                          required
+                        />
+                        <div className="flex gap-2 mt-3">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              setShowRejectForm(false)
+                              setRejectReason('')
+                            }}
+                            disabled={isLoading}
+                            className="border-gray-300 text-gray-700 hover:bg-gray-50"
+                          >
+                            Batal
+                          </Button>
+                          <Button
+                            variant="destructive"
+                            size="sm"
+                            onClick={() => {
+                              if (rejectReason.trim()) {
+                                handleStatusUpdate(selectedBooking.id, "REJECTED", rejectReason.trim())
+                                setShowRejectForm(false)
+                                setRejectReason('')
+                              }
+                            }}
+                            disabled={isLoading || !rejectReason.trim()}
+                            className="bg-red-600 hover:bg-red-700"
+                          >
+                            {isLoading ? "Memproses..." : "Konfirmasi Tolak"}
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+                    
                     <div className="flex gap-3">
                       <Button
                         onClick={() => handleStatusUpdate(selectedBooking.id, "APPROVED")}
-                        disabled={isLoading}
+                        disabled={isLoading || showRejectForm}
                         className="bg-green-600 hover:bg-green-700 text-white"
                       >
                         <CheckCircle className="h-4 w-4 mr-2" />
@@ -652,16 +783,18 @@ export default function AdminBookingsPage() {
                       <Button
                         variant="destructive"
                         onClick={() => {
-                          const alasan = prompt("Masukkan alasan penolakan:")
-                          if (alasan) {
-                            handleStatusUpdate(selectedBooking.id, "REJECTED", alasan)
+                          if (showRejectForm) {
+                            setShowRejectForm(false)
+                            setRejectReason('')
+                          } else {
+                            setShowRejectForm(true)
                           }
                         }}
                         disabled={isLoading}
                         className="bg-red-600 hover:bg-red-700 text-white"
                       >
                         <XCircle className="h-4 w-4 mr-2" />
-                        Tolak
+                        {showRejectForm ? "Batal Tolak" : "Tolak"}
                       </Button>
                     </div>
                   </div>
@@ -670,14 +803,24 @@ export default function AdminBookingsPage() {
                 {selectedBooking.status === "APPROVED" && (
                   <div className="border-t border-gray-200 pt-6">
                     <Label className="text-sm font-medium text-gray-800 mb-3 block">Aksi</Label>
-                    <Button
-                      onClick={() => handleStatusUpdate(selectedBooking.id, "COMPLETED")}
-                      disabled={isLoading}
-                      className="bg-blue-600 hover:bg-blue-700 text-white"
-                    >
-                      <CheckCircle className="h-4 w-4 mr-2" />
-                      {isLoading ? "Memproses..." : "Tandai Selesai"}
-                    </Button>
+                    <div className="flex gap-3">
+                      <Button
+                        onClick={() => handleDownloadSip(selectedBooking.id)}
+                        disabled={isLoading}
+                        className="bg-green-600 hover:bg-green-700 text-white"
+                      >
+                        <Download className="h-4 w-4 mr-2" />
+                        {isLoading ? "Memproses..." : "Download SIP"}
+                      </Button>
+                      <Button
+                        onClick={() => handleStatusUpdate(selectedBooking.id, "COMPLETED")}
+                        disabled={isLoading}
+                        className="bg-blue-600 hover:bg-blue-700 text-white"
+                      >
+                        <CheckCircle className="h-4 w-4 mr-2" />
+                        {isLoading ? "Memproses..." : "Tandai Selesai"}
+                      </Button>
+                    </div>
                   </div>
                 )}              </CardContent>
             </Card>

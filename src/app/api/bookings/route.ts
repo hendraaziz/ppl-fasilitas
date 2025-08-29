@@ -215,9 +215,25 @@ export async function POST(request: NextRequest) {
     // Note: Capacity check removed as jumlahPeserta is not in the schema
     // This can be added later if needed in the business logic
 
+    // Process date and time combination
+    let startDate: Date
+    let endDate: Date
+    
+    // Handle different input formats
+    if (validatedData.jamMulai && validatedData.jamSelesai) {
+      // Admin form with separate date and time fields
+      const startDateStr = validatedData.tglMulai || validatedData.tanggalMulai!
+      const endDateStr = validatedData.tglSelesai || validatedData.tanggalSelesai!
+      
+      startDate = new Date(`${startDateStr}T${validatedData.jamMulai}:00`)
+      endDate = new Date(`${endDateStr}T${validatedData.jamSelesai}:00`)
+    } else {
+      // Regular form with combined datetime
+      startDate = new Date(validatedData.tglMulai || validatedData.tanggalMulai!)
+      endDate = new Date(validatedData.tglSelesai || validatedData.tanggalSelesai!)
+    }
+    
     // Check for booking conflicts - improved logic to handle all overlap cases
-    const startDate = new Date(validatedData.tglMulai || validatedData.tanggalMulai!)
-    const endDate = new Date(validatedData.tglSelesai || validatedData.tanggalSelesai!)
     
     const conflictingBookings = await prisma.peminjaman.findMany({
       where: {
@@ -289,8 +305,8 @@ export async function POST(request: NextRequest) {
       data: {
         fasilitasId: validatedData.fasilitasId,
         userId: userId,
-        tglMulai: new Date(validatedData.tglMulai || validatedData.tanggalMulai!),
-        tglSelesai: new Date(validatedData.tglSelesai || validatedData.tanggalSelesai!),
+        tglMulai: startDate,
+        tglSelesai: endDate,
         tujuan: validatedData.tujuan,
         keterangan: validatedData.keterangan,
         status: 'DIPROSES'

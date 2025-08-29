@@ -3,17 +3,18 @@ import { getToken } from "next-auth/jwt"
 import { jwtVerify, JWTPayload } from "jose"
 
 export async function middleware(request: NextRequest) {
-  const token = await getToken({ req: request, secret: process.env.NEXTAUTH_SECRET })
   const { pathname } = request.nextUrl
 
-  // Allow access to auth pages and API routes
+  // Allow access to all API routes, auth pages, and home page
   if (
+    pathname.startsWith('/api') ||
     pathname.startsWith('/auth') ||
-    pathname.startsWith('/api/auth') ||
     pathname === '/'
   ) {
     return NextResponse.next()
   }
+
+  const token = await getToken({ req: request, secret: process.env.NEXTAUTH_SECRET })
 
   // Check for external token in cookies if NextAuth token is not present
   let externalToken = null

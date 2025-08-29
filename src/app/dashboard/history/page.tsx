@@ -6,7 +6,7 @@ import { useEffect, useState } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 
-import { ArrowLeft, Calendar, Clock, MapPin, User, FileText } from "lucide-react"
+import { ArrowLeft, Calendar, Clock, MapPin, User, FileText, Download } from "lucide-react"
 
 interface Peminjaman {
   id: string
@@ -45,6 +45,7 @@ export default function HistoryPage() {
   const [peminjaman, setPeminjaman] = useState<Peminjaman[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [filter, setFilter] = useState<string>('ALL')
+  const [downloadLoading, setDownloadLoading] = useState<string | null>(null)
 
   useEffect(() => {
     if (status === "loading") return
@@ -57,11 +58,52 @@ export default function HistoryPage() {
     loadPeminjaman()
   }, [status, router])
 
+  const handleDownloadSip = async (bookingId: string) => {
+    try {
+      setDownloadLoading(bookingId)
+      const response = await fetch(`/api/bookings/${bookingId}/generate-sip`)
+      
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || 'Gagal mengunduh SIP')
+      }
+      
+      const blob = await response.blob()
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.style.display = 'none'
+      a.href = url
+      a.download = `SIP-${bookingId}.pdf`
+      document.body.appendChild(a)
+      a.click()
+      window.URL.revokeObjectURL(url)
+      document.body.removeChild(a)
+    } catch (error) {
+      console.error('Error downloading SIP:', error)
+      alert(error instanceof Error ? error.message : 'Gagal mengunduh SIP')
+    } finally {
+      setDownloadLoading(null)
+    }
+  }
+
   const loadPeminjaman = async () => {
     try {
       // Get user's bookings from API
-      // TODO: Replace with actual user ID from session when NextAuth is properly configured
-      const response = await fetch(`/api/bookings?userId=cmeusutb5000b9kvsvrpti7ou&limit=100`)
+      if (!session?.user?.email) {
+        console.log('No user session found')
+        return
+      }
+      
+      // First get user ID from email
+      const userResponse = await fetch(`/api/users/by-email?email=${encodeURIComponent(session.user.email)}`)
+      const userData = await userResponse.json()
+      
+      if (!userData.success || !userData.data) {
+        console.log('User not found:', session.user.email)
+        return
+      }
+      
+      const response = await fetch(`/api/bookings?userId=${userData.data.id}&limit=100`)
       const result = await response.json()
       
       if (result.success && result.data) {
@@ -74,6 +116,7 @@ export default function HistoryPage() {
           tujuan: string
           status: string
           createdAt: string
+          alasanTolak?: string
         }
         const transformedData = result.data.map((booking: BookingData) => ({
           id: booking.id,
@@ -91,7 +134,7 @@ export default function HistoryPage() {
                   booking.status === 'DITOLAK' ? 'REJECTED' : 'COMPLETED',
           createdAt: booking.createdAt,
           approvedBy: booking.status === 'DISETUJUI' ? 'Admin Fasilitas' : undefined,
-          rejectedReason: booking.status === 'DITOLAK' ? 'Tidak memenuhi syarat' : undefined
+          rejectedReason: booking.status === 'DITOLAK' ? booking.alasanTolak : undefined
         }))
         
         setPeminjaman(transformedData)
@@ -296,6 +339,20 @@ export default function HistoryPage() {
                       )}
                     </div>
                   </div>
+                  
+                  {(booking.status === 'APPROVED' || booking.status === 'COMPLETED') && (
+                    <div className="border-t border-gray-200 pt-4 mt-4">
+                      <Button
+                        onClick={() => handleDownloadSip(booking.id)}
+                        disabled={downloadLoading === booking.id}
+                        className="bg-green-600 hover:bg-green-700 text-white"
+                        size="sm"
+                      >
+                        <Download className="h-4 w-4 mr-2" />
+                        {downloadLoading === booking.id ? "Mengunduh..." : "Download SIP"}
+                      </Button>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             ))}
